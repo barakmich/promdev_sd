@@ -4,8 +4,11 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"hash"
+	"log"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type TargetList []TargetSet
@@ -51,4 +54,13 @@ type Target struct {
 	TouchedAt    time.Time
 	Token        string
 	Namespace    string
+}
+
+func NewToken() string {
+	u := uuid.New()
+	v, err := u.MarshalBinary()
+	if err != nil {
+		log.Panicln(err)
+	}
+	return hex.EncodeToString(v)
 }
