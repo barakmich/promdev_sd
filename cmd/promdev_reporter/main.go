@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,6 +26,8 @@ var (
 	hostport          = pflag.StringP("hostport", "H", "127.0.0.1:9111", "Hostport of the promdev_sd server")
 	heartbeatInterval = pflag.DurationP("heartbeat-interval", "I", 15*time.Second, "Interval to refresh the advertisement")
 	targets           = pflag.StringArrayP("targets", "t", nil, "Targets to Report")
+	ports             = pflag.StringArrayP("ports", "p", nil, "Local ports to Report")
+	iface             = pflag.String("iface", "", "Interface of local ports to report (autodetected by route)")
 	labels            = pflag.StringArrayP("labels", "l", nil, "Labels to add to the targets")
 	namespace         = pflag.StringP("namespace", "n", "", "Namespace to report to")
 	debug             = pflag.Bool("debug", false, "Debug output")
@@ -31,7 +35,7 @@ var (
 
 func main() {
 	pflag.Parse()
-	if len(*targets) == 0 {
+	if len(*targets) == 0 && len(*ports) == 0 {
 		log.Fatalln("Must include at least one target")
 	}
 
@@ -106,6 +110,42 @@ func buildTargetSet() *promdev_sd.TargetSet {
 			log.Fatalln("Invalid label:", v)
 		}
 		out.Labels[pair[0]] = pair[1]
+	}
+	if len(*ports) != 0 {
+		var addrs []net.Addr
+		if *iface != "" {
+			i, err := net.InterfaceByName(*iface)
+			if err != nil {
+				log.Fatalf("Couldn't get interface %s by name: %s", *iface, err)
+			}
+			addrs, err = i.Addrs()
+			if err != nil {
+				log.Fatalf("Couldn't get interface %s addrs: %s", *iface, err)
+			}
+		} else {
+			var err error
+			hpsplit := strings.Split(*hostport, ":")
+			if len(hpsplit) != 2 {
+				log.Fatalln("Couldn't split hostport", *hostport, "(invalid?)")
+			}
+			ip := net.ParseIP(hpsplit[0])
+			outif := getRouteToIP(ip)
+			addrs, err = outif.Addrs()
+			if err != nil {
+				log.Fatalf("Couldn't get interface %s addrs: %s", outif.Name, err)
+			}
+		}
+		var ips []string
+		for _, masked := range addrs {
+			aparts := strings.Split(masked.String(), "/")
+			ips = append(ips, aparts[0])
+		}
+		for _, p := range *ports {
+			for _, ip := range ips {
+				hp := fmt.Sprintf("%s:%s", ip, p)
+				out.Targets = append(out.Targets, hp)
+			}
+		}
 	}
 	return out
 }
