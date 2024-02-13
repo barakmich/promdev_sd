@@ -10,8 +10,8 @@ I'm running [`tilt`](https://tilt.dev) or `docker-compose` or similar as I'm dev
 ## Plan
 
 - Organization runs a `promdev_server` which exposes:
-  - `/register` -- for new scrape targets to heartbeat against
-  - `/discovery` -- which is a HTTP_SD target added to the Prometheus config (either statically or because the `promdev_server` is running somewhere)
+  - `/register/<namespace>` -- for new scrape targets to heartbeat against
+  - `/discovery/<namespace>` -- which is a HTTP_SD target added to the Prometheus config 
 - Developer has options:
   - Runs `promdev_reporter` as a process (first goal)
     - It comes up and down with my development servers and simply heartbeats the static set of ports and `/metrics` endpoints up the chain
